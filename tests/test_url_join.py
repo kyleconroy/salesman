@@ -32,6 +32,8 @@ urls = [
      "http://site.com/99/1/2/3/moo.html"),
     ('http://site.com/99/x.html', '../1/2/3/moo.html',
      "http://site.com/1/2/3/moo.html"),
+    ('http://www.google.com', 'http://www.facebook.com',
+     "http://www.facebook.com"),
     ]
 
 def check_url_join(base, link, expected):

@@ -8,6 +8,8 @@ from argparse import ArgumentParser
 from gevent.pool import Pool
 from salesman import get_urls
 
+logging.basicConfig(filename='travel.log', level=logging.DEBUG)
+
 parser = ArgumentParser(description="Check all links")
 parser.add_argument("url", type=str, help="First URL to visit")
 args = parser.parse_args()
@@ -16,9 +18,7 @@ base = urlparse.urlparse(args.url)
 visited_urls = set()
 next_urls = [(args.url, "")]
 
-pool = Pool(50)
-
-def visit(url):
+def visit(url, source):
     if url in visited_urls:
         return
 
@@ -28,28 +28,23 @@ def visit(url):
     try:
         response = requests.get(url)
     except:
-        print ", ".join([BAD_URL, 600, plans, url])
+        return
 
-    status = "OK" if response.ok else "FAIL"
+    level = logging.INFO if response.ok else logging.ERROR
     plans = "VISIT" if o.netloc == base.netloc else "STOP"
-    log = [status, str(response.status_code), plans, url]
+    #log = [str(response.status_code), plans, url]
 
-    if response.ok:
-        logging.info(*log)
-    else:
-        logging.error(*log)
+    logging.log(level, "%s %s %s", response.status_code, url, source)
 
     if o.netloc == base.netloc:
         try:
-            next_urls.extend(get_urls(url, response.content))
+            urls = [(u, url) for u in get_urls(url, response.content)]
+            next_urls.extend(urls)
         except:
-            ## Failed HTML parsing
             pass
 
-visit(args.url)
-
 while next_urls:
-    for url in next_urls:
-        pool.spawn(visit, url)
+    pool = Pool(50)
+    for url, source in next_urls:
+        pool.spawn(visit, url, source)
     pool.join()
-
