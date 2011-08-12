@@ -1,5 +1,5 @@
 import gevent
-from gevent import monkey; monkey.patch_all()
+#from gevent import monkey; monkey.patch_all()
 
 import requests
 import urlparse
@@ -22,14 +22,20 @@ def visit(url, source):
     if url in visited_urls:
         return
 
-    o = urlparse.urlparse(url)
     visited_urls.add(url)
 
     try:
         response = requests.get(url)
-    except:
+    except Exception as e:
         return
 
+    # Make sure to reset url for redirects
+    url = response.url
+
+    # Add the new url to the set as well
+    visited_urls.add(url)
+
+    o = urlparse.urlparse(url)
     level = logging.INFO if response.ok else logging.ERROR
     plans = "VISIT" if o.netloc == base.netloc else "STOP"
     #log = [str(response.status_code), plans, url]
@@ -43,8 +49,12 @@ def visit(url, source):
         except:
             pass
 
-while next_urls:
+for i in range(2):
     pool = Pool(50)
-    for url, source in next_urls:
-        pool.spawn(visit, url, source)
+    current_urls = list(next_urls)
+    del next_urls[:]
+
+    for vurl, source in current_urls:
+        pool.spawn(visit, vurl, source)
     pool.join()
+

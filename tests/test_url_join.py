@@ -10,6 +10,8 @@ urls = [
      "http://www.google.com/docs?hey=you"),
     ("http://www.google.com/foo#bar", "docs?hey=you#foo",
      "http://www.google.com/docs?hey=you#foo"),
+    ("http://www.google.com/docs/client/", "../api/twiml/client",
+     "http://www.google.com/docs/api/twiml/client"),
     #("http://www.google.com/foo/bar", ".", "http://www.google.com/foo/"),
     ("http://www.google.com/foo", "..", "http://www.google.com/"),
     ("http://www.google.com/foo", "../..", "http://www.google.com/"),

@@ -5,11 +5,8 @@ from urlparse import urljoin
 from urlparse import urlparse
 from urlparse import urlunparse
 
-logging.basicConfig(filename='url.log', level=logging.DEBUG)
-
 def url_join(base, link):
-    o = urlparse(link)
-    if o.netloc:
+    if urlparse(link).netloc:
         return link
 
     join = urljoin(base, link)
