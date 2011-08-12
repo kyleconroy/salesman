@@ -1,4 +1,5 @@
 import os
+from lxml import etree
 from urlparse import urljoin
 from urlparse import urlparse
 from urlparse import urlunparse
@@ -11,3 +12,12 @@ def url_join(base, link):
     return urlunparse(
         (url.scheme, url.netloc, path, url.params, url.query, url.fragment)
         )
+
+
+def get_urls(base, html):
+    """Given a string of html, return all the urls that are linked
+    """
+    tree = etree.HTML(html)
+    links = tree.iterfind(".//a[@href]")
+    return [url_join(base, a.attrib["href"]) for a in links]
+
