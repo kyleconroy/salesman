@@ -4,7 +4,6 @@ from salesman import Salesman
 
 
 def main():
-
     parser = ArgumentParser(description="Check all links")
     parser.add_argument("action", type=str, choices=["visit", "explore"],
                         help=("What action Salesman should take"))
@@ -12,6 +11,8 @@ def main():
     args = parser.parse_args()
 
     willy_lowman = Salesman()
+
+    print "Traveling your website. This could take O(n^2*2^n) time"
 
     if args.action == "visit":
         if os.path.isfile(args.url):

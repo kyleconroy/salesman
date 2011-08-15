@@ -86,7 +86,7 @@ class Salesman(object):
         if log_config is None:
             log_config = LOG_CONFIG
 
-        if logger is None:
+        if logger is not None:
             self.logger = logger
         else:
             logging.config.dictConfig(log_config)
@@ -162,11 +162,10 @@ class Salesman(object):
         # Limit Pool size to 100 to prevent HTTP timeouts
         pool = Pool(100)
 
-        def visit(url, source):
-            if not self.is_invalid(url):
-                urls = self.visit(url, source)
-                for vurl, source in urls:
-                    pool.apply_async(visit, args=[vurl, source])
+        def visit(target, source):
+            if not self.is_invalid(target):
+                for url, source in self.visit(target, source):
+                    pool.apply_async(visit, args=[url, source])
 
         pool.apply_async(visit, args=[url, None])
         pool.join()

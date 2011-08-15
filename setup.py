@@ -7,7 +7,7 @@ setup(
     author_email = "kyle.j.conroy@gmail.com",
     url = "http://github.com/derferman/salesman/",
     keywords = ["http","checker"],
-    install_requires = ["requests", "lxml", "gevent"],
+    install_requires = ["restkit", "lxml", "gevent"],
     packages = find_packages(),
     entry_points = {
         'console_scripts': [
