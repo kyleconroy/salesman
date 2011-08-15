@@ -1,4 +1,5 @@
-from gevent import monkey; monkey.patch_all()
+from gevent import monkey
+monkey.patch_all()
 
 import os
 import logging
@@ -12,8 +13,9 @@ from urlparse import urljoin
 from urlparse import urlparse
 from urlparse import urlunparse
 
-# Set the rest kit manager to gevent
-set_manager(GeventManager(timeout=300))
+# set the gevent connection manager
+set_manager(GeventManager(timeout=200))
+
 
 def url_join(base, link):
     if urlparse(link).netloc:
@@ -22,8 +24,10 @@ def url_join(base, link):
     join = urljoin(base, link)
     url = urlparse(join)
     path = os.path.normpath(url.path)
+    # Strip hashes, bug in restkit
+
     return urlunparse(
-        (url.scheme, url.netloc, path, url.params, url.query, url.fragment)
+        (url.scheme, url.netloc, path, url.params, url.query, None)
         )
 
 
@@ -32,17 +36,19 @@ def get_urls(base, html):
     """
     tree = etree.HTML(html)
     links = tree.iterfind(".//a[@href]")
-    return [url_join(base, a.attrib["href"]) for a in links]
+    return [url_join(base, a.attrib["href"].strip()) for a in links]
 
 
 LOG_CONFIG = {
     "version": 1,
     "formatters": {
         "salesman": {
-            "format": "[%(levelname)s] - %(status)s %(url)s %(source)s %(message)s",
+            "format": ("[%(levelname)s] - %(status)s %(url)s "
+                       "%(source)s %(message)s"),
         },
         "pretty-salesman": {
-            "format": "%(levelname)s\tHTTP %(status)s\nURL\t%(url)s\nSOURCE\t%(source)s\n\n",
+            "format": ("%(levelname)s\tHTTP %(status)s\nURL\t%(url)s\nSOURCE"
+                       "\t%(source)s\n\n"),
         },
     },
     "handlers": {
@@ -67,18 +73,23 @@ LOG_CONFIG = {
     }
 }
 
+
 class Salesman(object):
 
-    def __init__(self, externals=False, logger=None):
+    def __init__(self, externals=False, logger=None, log_config=None):
         """
         :param externals: If True, check that links to external URLs are valid
         :param logger: The logger to use
+        :param log_config: The log_config dictionary to use
         :param verbose: If true, print out errors to stderror
         """
-        if logger:
+        if log_config is None:
+            log_config = LOG_CONFIG
+
+        if logger is None:
             self.logger = logger
         else:
-            logging.config.dictConfig(LOG_CONFIG)
+            logging.config.dictConfig(log_config)
             self.logger = logging.getLogger("salesman")
 
         self.externals = externals
@@ -87,26 +98,24 @@ class Salesman(object):
 
     def verify(self, *vurls):
         for url in vurls:
+            self.base = urlparse(url)
             urls = self.visit(url)
 
             # Limit Pool size to 100 to prevent HTTP timeouts
             pool = Pool(100)
 
             def visit(url, source):
-                if url not in self.visited_urls:
+                if not self.is_invalid(url):
                     self.visit(url, source)
 
             for vurl, source in urls:
                 pool.spawn(visit, vurl, source)
             pool.join()
 
-
     def visit(self, url, source=None):
         """ Visit the url and return the response
         :return: The set of urls on that page
         """
-        base = urlparse(url)
-
         self.visited_urls.add(url)
 
         try:
@@ -114,7 +123,7 @@ class Salesman(object):
         except Exception as e:
             return []
 
-        # Make sure to reset url for redirects
+        # Rest the url for redirects
         url = response.final_url
 
         # Add the new url to the set as well
@@ -122,17 +131,17 @@ class Salesman(object):
 
         o = urlparse(url)
         level = logging.INFO if response.status_int < 400 else logging.ERROR
-        plans = "VISIT" if o.netloc == base.netloc else "STOP"
+        plans = "VISIT" if o.netloc == self.base.netloc else "STOP"
 
         d = {
-            "status": response.status_int,
+            "status": response.status,
             "url": url,
             "source": source,
             }
 
         self.logger.log(level, "%s", plans, extra=d)
 
-        if o.netloc != base.netloc:
+        if o.netloc != self.base.netloc:
             return []
 
         try:
@@ -140,23 +149,24 @@ class Salesman(object):
         except Exception as e:
             return []
 
+    def is_invalid(self, url):
+        return (url in self.visited_urls
+                or url.startswith("mailto:")
+                or url.startswith("javascript:"))
+
     def explore(self, url):
         """Travel will never stop"""
         self.visited_urls = set()
-        self.next_urls = [(url, None)]
+        self.base = urlparse(url)
 
-        while self.next_urls:
-            url, source = self.next_urls.pop(0)
-            urls = self.visit(url, source)
+        # Limit Pool size to 100 to prevent HTTP timeouts
+        pool = Pool(100)
 
-            # Limit Pool size to 100 to prevent HTTP timeouts
-            pool = Pool(100)
+        def visit(url, source):
+            if not self.is_invalid(url):
+                urls = self.visit(url, source)
+                for vurl, source in urls:
+                    pool.apply_async(visit, args=[vurl, source])
 
-            def visit(url, source):
-                if url not in self.visited_urls:
-                    urls = self.visit(url, source)
-                    self.next_urls.extend(urls)
-
-            for vurl, source in urls:
-                pool.spawn(visit, vurl, source)
-            pool.join()
+        pool.apply_async(visit, args=[url, None])
+        pool.join()

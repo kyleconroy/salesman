@@ -9,6 +9,11 @@ setup(
     keywords = ["http","checker"],
     install_requires = ["requests", "lxml", "gevent"],
     packages = find_packages(),
+    entry_points = {
+        'console_scripts': [
+            'salesman = salesman.cmd_line:main',
+            ]
+        },
     classifiers = [
         "Intended Audience :: Developers",
         "License :: OSI Approved :: MIT License",
